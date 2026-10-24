@@ -1152,7 +1152,8 @@ def test_build_gemini_prompt_enforces_strict_refusal_and_minimal_evidence_payloa
     assert "document_id=" not in prompt
     assert "chunk_role=" not in prompt
     assert "text=The city purchased 12 electric vans from Voltara Mobility." in prompt
-    assert '"cited_chunk_ids": ["chunk_id1"]' in prompt
+    assert '"answer_mode": "exact_lookup", "answer_text"' in prompt  # the example carries the mode asked for
+    assert '["chunk_id1"]' not in prompt  # and a real chunk id, never a placeholder a model could copy
     assert "citation_id=" not in prompt
 
 

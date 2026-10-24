@@ -163,6 +163,18 @@ def _build_prompt(*, query_text: str, evidence_package: EvidencePackage) -> str:
             )
         )
 
+    # The example carries the mode asked for and a real chunk id: a model that copies the example then copies
+    # the right values, where a placeholder ("summary", "chunk_id1") was copied verbatim and rejected.
+    example_id = evidence_package.items[0].chunk_id if evidence_package.items else "chunk_id1"
+    example = json.dumps(
+        {
+            "is_refusal": False,
+            "answer_mode": answer_mode,
+            "answer_text": "your answer here",
+            "cited_chunk_ids": [example_id],
+            "citation_snippets": [{"chunk_id": example_id, "snippet": "relevant text"}],
+        }
+    )
     return "\n\n".join(
         [
             "You are a helpful assistant that answers questions using the provided evidence.",
@@ -174,7 +186,10 @@ def _build_prompt(*, query_text: str, evidence_package: EvidencePackage) -> str:
             "Focus hints:",
             "\n".join(f"- {hint}" for hint in focus_hints) if focus_hints else "- Use the query wording to choose the answer shape.",
             "Return this JSON:",
-            '{"is_refusal": false, "answer_mode": "summary", "answer_text": "your answer here", "cited_chunk_ids": ["chunk_id1"], "citation_snippets": [{"chunk_id": "chunk_id1", "snippet": "relevant text"}]}',
+            example,
+            f"answer_mode must be exactly {answer_mode!r}, the MODE named above.",
+            "cited_chunk_ids holds chunk_id values copied exactly from the evidence below; never invent one.",
+            f'When the evidence does not answer the question, set is_refusal to true, answer_text to exactly "{REFUSAL_TEXT}", and cite nothing.',
             "answer_text may contain Markdown, but the overall response must still be valid JSON.",
             "Never refuse unless evidence is completely unrelated.",
             f"Query: {query_text}",
@@ -328,14 +343,12 @@ def _parse_result(payload: dict[str, object]) -> GeminiResult:
         citation_snippets[normalized_chunk_id] = snippet.strip()
 
     if is_refusal:
-        if answer_text != REFUSAL_TEXT:
-            raise GeminiGenerationError("Gemini returned an invalid refusal answer_text.")
-        if cited_chunk_ids or citation_snippets:
-            raise GeminiGenerationError("Gemini refusal must not cite evidence.")
+        # A refusal is a refusal however the model words it; the caller sees the one refusal text and no
+        # citations, instead of a provider error over the wording.
         return GeminiResult(
             is_refusal=True,
             answer_mode=answer_mode,
-            answer_text=answer_text,
+            answer_text=REFUSAL_TEXT,
             cited_chunk_ids=[],
             citation_snippets={},
         )

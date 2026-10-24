@@ -219,14 +219,14 @@ async def test_generator_rejects_output_outside_the_contract(
 
 @pytest.mark.asyncio()
 async def test_generator_requires_a_model(monkeypatch) -> None:
-    monkeypatch.setenv("GENERATOR_BACKEND", "bedrock_v1")
-    monkeypatch.delenv("BEDROCK_MODEL", raising=False)
-    get_settings.cache_clear()
-    try:
-        with pytest.raises(BedrockGenerationError, match="BEDROCK_MODEL"):
-            await generate_bedrock_draft(query_text=_QUERY, evidence_package=_package())
-    finally:
-        get_settings.cache_clear()
+    """Settings built without the .env file, so a model configured there cannot make this test pass."""
+
+    from app.core import bedrock_generator
+
+    settings = Settings(_env_file=None, generator_backend="bedrock_v1", bedrock_model=None)
+    monkeypatch.setattr(bedrock_generator, "get_settings", lambda: settings)
+    with pytest.raises(BedrockGenerationError, match="BEDROCK_MODEL"):
+        await generate_bedrock_draft(query_text=_QUERY, evidence_package=_package())
 
 
 def test_generation_registry_resolves_the_bedrock_backend(bedrock_env: Any) -> None:
