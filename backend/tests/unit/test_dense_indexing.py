@@ -213,15 +213,22 @@ async def test_dense_index_document_reads_manifest_and_upserts_points(
         return json.dumps(manifest.to_payload()).encode("utf-8")
 
     captured: dict[str, object] = {}
+    order: list[str] = []
+
+    def fake_ensure_qdrant_collection(*, vector_size: int) -> None:
+        captured["ensured_vector_size"] = vector_size
+        order.append("ensure")
 
     def fake_upsert_dense_points(*, points, vector_size: int) -> int:
         captured["points"] = points
         captured["vector_size"] = vector_size
+        order.append("upsert")
         return len(points)
 
     def fake_delete_dense_points_for_document(*, tenant_id, document_id) -> None:
         captured["deleted_tenant_id"] = tenant_id
         captured["deleted_document_id"] = document_id
+        order.append("delete")
 
     monkeypatch.setattr("app.services.dense_indexing.download_bytes", fake_download_bytes)
     async def fake_embed_texts(texts: list[str], *, purpose: str = "generic"):
@@ -237,6 +244,10 @@ async def test_dense_index_document_reads_manifest_and_upserts_points(
         ]
 
     monkeypatch.setattr("app.services.dense_indexing.embed_texts", fake_embed_texts)
+    monkeypatch.setattr(
+        "app.services.dense_indexing.ensure_qdrant_collection",
+        fake_ensure_qdrant_collection,
+    )
     monkeypatch.setattr(
         "app.services.dense_indexing.delete_dense_points_for_document",
         fake_delete_dense_points_for_document,
@@ -260,6 +271,9 @@ async def test_dense_index_document_reads_manifest_and_upserts_points(
     assert result.vector_dimensions == 16
     assert captured["deleted_tenant_id"] == context.tenant_id
     assert captured["deleted_document_id"] == context.document_id
+    # the collection exists before the old points are deleted from it: a fresh store's first ingestion works
+    assert order == ["ensure", "delete", "upsert"]
+    assert captured["ensured_vector_size"] == 16
     assert captured["vector_size"] == 16
     points = captured["points"]
     assert isinstance(points, list)
