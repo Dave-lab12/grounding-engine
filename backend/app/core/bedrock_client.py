@@ -32,6 +32,11 @@ def get_bedrock_runtime_client() -> BaseClient:
     """
 
     settings = get_settings()
+    credentials = {
+        "aws_access_key_id": settings.aws_access_key_id,
+        "aws_secret_access_key": settings.aws_secret_access_key,
+        "aws_session_token": settings.aws_session_token,
+    }
     return boto3.client(
         "bedrock-runtime",
         region_name=settings.bedrock_region,
@@ -39,6 +44,7 @@ def get_bedrock_runtime_client() -> BaseClient:
             read_timeout=settings.bedrock_timeout_seconds,
             retries={"max_attempts": 1},
         ),
+        **{name: value for name, value in credentials.items() if value},
     )
 
 

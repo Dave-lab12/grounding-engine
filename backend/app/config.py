@@ -14,8 +14,12 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 AppEnv = Literal["development", "test", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-GeneratorBackend = Literal["local_grounded_v1", "gemini_v1", "openai_compatible_v1", "bedrock_v1"]
-EmbeddingBackend = Literal["local_hash_v1", "gemini_v1", "openai_compatible_v1", "bedrock_v1"]
+GeneratorBackend = Literal[
+    "local_grounded_v1", "gemini_v1", "openai_compatible_v1", "bedrock_v1"
+]
+EmbeddingBackend = Literal[
+    "local_hash_v1", "gemini_v1", "openai_compatible_v1", "bedrock_v1"
+]
 RerankerBackend = Literal["disabled", "stub", "gemini_v1", "bedrock_v1"]
 RetrievalMode = Literal["hybrid", "dense_only"]
 
@@ -62,6 +66,11 @@ class Settings(BaseSettings):
     bedrock_model: str | None = None
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     bedrock_timeout_seconds: int = 60
+    # Explicit AWS credentials for Bedrock, for a .env without a shared AWS profile; unset, boto3's default
+    # chain decides. The standard names, so a shell export and a .env line are the same thing.
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_session_token: str | None = None
     provider_max_retries: int = 2
     provider_retry_backoff_ms: int = 250
     qdrant_url: AnyHttpUrl = "http://localhost:6333"
@@ -170,7 +179,15 @@ class Settings(BaseSettings):
             raise ValueError("GENERATOR_BACKEND must not be empty.")
         return normalized
 
-    @field_validator("gemini_api_key", "openai_api_key", "bedrock_region", "bedrock_model")
+    @field_validator(
+        "gemini_api_key",
+        "openai_api_key",
+        "bedrock_region",
+        "bedrock_model",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+    )
     @classmethod
     def normalize_optional_secret(cls, value: str | None) -> str | None:
         """Normalize optional provider settings: a blank value is unset."""
@@ -242,7 +259,9 @@ class Settings(BaseSettings):
         "enterprise_reranker_candidate_limit",
     )
     @classmethod
-    def validate_positive_retrieval_settings(cls, value: int, info: ValidationInfo) -> int:
+    def validate_positive_retrieval_settings(
+        cls, value: int, info: ValidationInfo
+    ) -> int:
         """Ensure retrieval limits and fusion constants remain positive."""
 
         if value <= 0:
@@ -311,9 +330,7 @@ class Settings(BaseSettings):
 
         endpoint = info.data.get("s3_endpoint_url")
         if endpoint is not None and value != (endpoint.scheme == "https"):
-            raise ValueError(
-                "S3_SECURE must match the scheme used by S3_ENDPOINT_URL."
-            )
+            raise ValueError("S3_SECURE must match the scheme used by S3_ENDPOINT_URL.")
         return value
 
     def startup_warnings(self) -> list[str]:
@@ -340,7 +357,8 @@ class Settings(BaseSettings):
                 )
             else:
                 warnings.append(
-                    message + "dense retrieval will fail until Gemini embeddings are configured."
+                    message
+                    + "dense retrieval will fail until Gemini embeddings are configured."
                 )
         if self.generator_backend == "openai_compatible_v1" and not self.openai_api_key:
             warnings.append(
@@ -348,16 +366,15 @@ class Settings(BaseSettings):
                 "Standard generation will fail until it is set."
             )
         if self.embedding_backend == "openai_compatible_v1" and not self.openai_api_key:
-            message = (
-                "EMBEDDING_BACKEND=openai_compatible_v1 is configured without OPENAI_API_KEY; "
-            )
+            message = "EMBEDDING_BACKEND=openai_compatible_v1 is configured without OPENAI_API_KEY; "
             if self.embedding_provider_fallback_enabled:
                 warnings.append(
                     message + "dense retrieval will fall back to local hash embeddings."
                 )
             else:
                 warnings.append(
-                    message + "dense retrieval will fail until provider embeddings are configured."
+                    message
+                    + "dense retrieval will fail until provider embeddings are configured."
                 )
         if (
             self.enterprise_enabled

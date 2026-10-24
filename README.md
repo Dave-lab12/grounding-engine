@@ -211,7 +211,8 @@ Every provider slot (generation, dense embeddings, the Enterprise reranker) has 
 runs on AWS Bedrock through boto3, which the backend already depends on for object storage.
 
 - Credentials come from the AWS default chain: `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID` and
-  `AWS_SECRET_ACCESS_KEY` in the shell, or an instance role. The S3 settings are not used.
+  `AWS_SECRET_ACCESS_KEY` in the shell, or an instance role. The same two names (and `AWS_SESSION_TOKEN`) may
+  be set in `.env` instead; the backend hands them to boto3. The S3 settings are not used.
 - `BEDROCK_REGION` picks the region; `BEDROCK_MODEL` is the generation and reranking model, given as an
   inference profile id (for example `us.anthropic.<model>`).
 - `BEDROCK_EMBEDDING_MODEL` defaults to Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`), whose
