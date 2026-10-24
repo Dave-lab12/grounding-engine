@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import psycopg
-import pytest
 from docx import Document as DocxDocument
 
 from app.config import get_settings

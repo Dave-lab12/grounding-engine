@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 
-import pytest
 from botocore.exceptions import ClientError
 
 from app.config import get_settings

@@ -13,6 +13,7 @@ from app.core.embeddings import DenseEmbedding, EmbeddingError, embed_texts
 from app.core.qdrant_client import (
     VectorStoreError,
     delete_dense_points_for_document,
+    ensure_qdrant_collection,
     upsert_dense_points,
 )
 from app.core.storage import StorageError, download_bytes
@@ -160,6 +161,9 @@ async def dense_index_document(
     ]
 
     try:
+        # On a fresh vector store the collection does not exist yet; deleting from it fails before the
+        # upsert, which is what used to create it, so every first ingestion failed. Ensure it first.
+        ensure_qdrant_collection(vector_size=vector_dimensions)
         delete_dense_points_for_document(
             tenant_id=context.tenant_id,
             document_id=context.document_id,
@@ -171,7 +175,7 @@ async def dense_index_document(
     except VectorStoreError as exc:
         raise IngestionProcessorError(
             "DENSE_INDEX_UPSERT_FAILED",
-            "Dense indexing failed while writing chunk vectors to Qdrant.",
+            f"Dense indexing failed while writing chunk vectors to Qdrant: {exc.__cause__ or exc}",
         ) from exc
 
     return DenseIndexingResult(

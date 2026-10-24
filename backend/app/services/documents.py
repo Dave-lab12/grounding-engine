@@ -15,9 +15,6 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.telemetry import get_logger
-
-logger = get_logger("app.documents")
-
 from app.api.deps import TenantContext
 from app.config import get_settings
 from app.core.storage import StorageError, delete_object, upload_bytes
@@ -29,6 +26,7 @@ from app.models import (
     Namespace,
 )
 
+logger = get_logger("app.documents")
 
 _SUPPORTED_UPLOAD_TYPES: Final[dict[str, str]] = {
     ".txt": "text/plain",

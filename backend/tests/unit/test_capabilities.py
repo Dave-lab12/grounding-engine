@@ -46,8 +46,19 @@ def test_capabilities_enable_only_standard_backed_modes_for_free_plan() -> None:
     assert modes[UserFacingMode.VERIFIED].availability_reason == "plan_restricted"
 
 
-def test_capabilities_enable_thinking_and_verified_when_critical_is_live() -> None:
-    """Enterprise-capable tenants should receive Thinking and Verified when Critical is enabled."""
+def test_capabilities_leave_verified_coming_soon_until_critical_is_enabled(monkeypatch) -> None:
+    """With Critical off (the CRITICAL_ENABLED default), Enterprise-capable tenants receive Thinking, and
+    Verified stays disabled as coming_soon."""
+
+    monkeypatch.setattr(
+        capabilities_module,
+        "get_settings",
+        lambda: type(
+            "SettingsStub",
+            (),
+            {"enterprise_enabled": True, "critical_enabled": False},
+        )(),
+    )
 
     response = build_capabilities_response(
         tenant_context=_tenant_context(
@@ -62,8 +73,8 @@ def test_capabilities_enable_thinking_and_verified_when_critical_is_live() -> No
     assert modes[UserFacingMode.INSTANT].enabled is True
     assert modes[UserFacingMode.THINKING].enabled is True
     assert modes[UserFacingMode.THINKING].availability_reason is None
-    assert modes[UserFacingMode.VERIFIED].enabled is True
-    assert modes[UserFacingMode.VERIFIED].availability_reason is None
+    assert modes[UserFacingMode.VERIFIED].enabled is False
+    assert modes[UserFacingMode.VERIFIED].availability_reason == "coming_soon"
 
 
 def test_capabilities_respect_max_execution_tier_before_future_implementation() -> None:

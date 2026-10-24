@@ -78,7 +78,7 @@ def load_queries(queries_path: Path) -> dict[str, BEIRQuery]:
 def load_qrels(qrel_path: Path) -> dict[str, list[BEIRQrel]]:
     qrels: dict[str, list[BEIRQrel]] = {}
     with qrel_path.open() as fh:
-        header = fh.readline()
+        fh.readline()  # the header row
         for line in fh:
             parts = line.strip().split("\t")
             if len(parts) >= 3:

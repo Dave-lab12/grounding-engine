@@ -10,7 +10,10 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from botocore.exceptions import BotoCoreError, ClientError
+
 from app.config import Settings, get_settings
+from app.core import bedrock_client
 from app.core.provider_retry import run_with_retries
 from app.models import ExecutionTier
 from app.pipeline.contracts import FusedRetrievedChunk
@@ -130,8 +133,9 @@ class GeminiEnterpriseReranker:
     timeout_seconds: int
     backend_name: str = "gemini_v1"
 
-    def _build_prompt(self, *, query_text: str, hits: list[FusedRetrievedChunk], limit: int) -> str:
-        """Render a strict ranking prompt for Gemini."""
+    @staticmethod
+    def _build_prompt(*, query_text: str, hits: list[FusedRetrievedChunk], limit: int) -> str:
+        """Render a strict ranking prompt for the model (shared with the Bedrock reranker)."""
 
         hit_blocks = [
             "\n".join(
@@ -363,6 +367,75 @@ class GeminiEnterpriseReranker:
         )
 
 
+@dataclass(frozen=True)
+class BedrockEnterpriseReranker:
+    """Bedrock-backed Enterprise reranker: the Gemini reranker's prompt and JSON contract over Converse.
+
+    The contract helpers are shared, not copied, so a rejected payload is reported in their words.
+    """
+
+    model: str
+    max_retries: int
+    backoff_ms: int
+    backend_name: str = "bedrock_v1"
+
+    async def rerank(
+        self,
+        *,
+        query_text: str,
+        hits: list[FusedRetrievedChunk],
+        limit: int,
+    ) -> RerankerResult:
+        """Call a Bedrock model to rerank fused hits by answerability."""
+
+        if not hits:
+            return RerankerResult(backend_name=self.backend_name, applied=True, hits=[])
+
+        prompt = GeminiEnterpriseReranker._build_prompt(query_text=query_text, hits=hits, limit=limit)
+        request: dict[str, object] = {
+            "modelId": self.model,
+            "messages": [{"role": "user", "content": [{"text": prompt}]}],
+            # enough room for `limit` hits with a short reason each; the Gemini backend's 256 is tight
+            "inferenceConfig": {"temperature": 0, "topP": 0.1, "maxTokens": 2048},
+        }
+        client = bedrock_client.get_bedrock_runtime_client()
+        try:
+            response = await run_with_retries(
+                lambda: asyncio.to_thread(client.converse, **request),
+                max_retries=self.max_retries,
+                backoff_ms=self.backoff_ms,
+                should_retry=bedrock_client.is_retryable_bedrock_error,
+            )
+        except ClientError as exc:
+            raise RerankerError(f"Bedrock reranker failed: {bedrock_client.error_detail(exc)}") from exc
+        except BotoCoreError as exc:
+            raise RerankerError("Bedrock reranker request failed.") from exc
+
+        output = response.get("output") if isinstance(response, dict) else None
+        message = output.get("message") if isinstance(output, dict) else None
+        content = message.get("content") if isinstance(message, dict) else None
+        text_parts = [
+            block["text"].strip()
+            for block in (content or [])
+            if isinstance(block, dict) and isinstance(block.get("text"), str) and block["text"].strip()
+        ]
+        if not text_parts:
+            raise RerankerError("Bedrock reranker returned empty text content.")
+
+        payload = GeminiEnterpriseReranker._coerce_json_text("\n".join(text_parts))
+        parsed_hits = GeminiEnterpriseReranker._parse_hits(
+            payload,
+            candidate_ids={hit.chunk_id for hit in hits},
+            limit=limit,
+        )
+        return RerankerResult(
+            backend_name=self.backend_name,
+            applied=True,
+            hits=parsed_hits,
+            debug={"candidate_count": len(hits)},
+        )
+
+
 def resolve_retrieval_reranker(
     *,
     execution_tier: ExecutionTier,
@@ -390,5 +463,13 @@ def resolve_retrieval_reranker(
             max_retries=resolved_settings.provider_max_retries,
             backoff_ms=resolved_settings.provider_retry_backoff_ms,
             timeout_seconds=resolved_settings.openai_timeout_seconds,
+        )
+    if resolved_settings.enterprise_reranker_backend == "bedrock_v1":
+        if not resolved_settings.bedrock_model:
+            return DisabledReranker(reason="bedrock_model_missing")
+        return BedrockEnterpriseReranker(
+            model=resolved_settings.bedrock_model,
+            max_retries=resolved_settings.provider_max_retries,
+            backoff_ms=resolved_settings.provider_retry_backoff_ms,
         )
     return DisabledReranker(reason="enterprise_reranker_backend_disabled")

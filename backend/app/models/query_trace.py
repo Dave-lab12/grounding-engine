@@ -26,8 +26,6 @@ from app.core.database import Base
 from app.models.enums import ExecutionTier, UserFacingMode, sqlalchemy_enum
 
 if TYPE_CHECKING:
-    from app.models.agent import Agent
-    from app.models.conversation import Conversation
     from app.models.namespace import Namespace
     from app.models.tenant import Tenant
 
