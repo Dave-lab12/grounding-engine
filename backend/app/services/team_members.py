@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 import hashlib
 import secrets
 
@@ -13,7 +12,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.telemetry import get_logger
-from app.models.enums import WorkspaceMemberRole, WorkspaceMemberStatus
+from app.models.enums import WorkspaceMemberStatus
 from app.models.workspace_member import WorkspaceMember
 from app.schemas.team_members import TeamMemberInviteRequest, TeamMemberUpdateRequest
 

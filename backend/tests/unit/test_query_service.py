@@ -1509,7 +1509,7 @@ async def test_execute_standard_query_persists_critical_policy_metadata(monkeypa
     )
 
     trace = session.added[0]
-    policy = trace.verifier_result["critical_verifier"]
+    assert "critical_verifier" in trace.verifier_result
     assert trace.verifier_result["evidence_debug"]["critical_policy"]["external_fallback"]["allowed"] is True
     assert trace.verifier_result["evidence_debug"]["critical_policy"]["external_fallback"]["reason"] == "allowlisted_policy_enabled"
     assert trace.verifier_result["evidence_debug"]["critical_policy"]["internal_model_retrieval"]["allowed"] is False

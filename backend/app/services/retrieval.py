@@ -249,11 +249,10 @@ async def _apply_enterprise_freshness_scoring(
     query_plan: QueryPlan,
     execution_tier: ExecutionTier,
     freshness_profile: FreshnessProfile,
-) -> list[FusedRetrievedChunk]:
+) -> tuple[list[FusedRetrievedChunk], dict[str, object]]:
     """Prefer newer evidence when the Enterprise query explicitly needs freshness."""
 
     settings = get_settings()
-    retrieval_mode = getattr(settings, "retrieval_mode", "hybrid")
     if (
         execution_tier is not ExecutionTier.ENTERPRISE
         or not getattr(settings, "enterprise_temporal_scoring_enabled", True)

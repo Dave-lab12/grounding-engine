@@ -18,9 +18,9 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.agents import AgentChatResponse, AgentResponse
-from app.schemas.api_keys import APIKeyCreateResponse, APIKeyResponse
-from app.schemas.datasets import DatasetResponse, DatasetDocumentResponse, DatasetUploadResponse
+from app.schemas.agents import AgentResponse
+from app.schemas.api_keys import APIKeyResponse
+from app.schemas.datasets import DatasetResponse, DatasetUploadResponse
 from app.models.enums import IngestionJobStatus
 from app.schemas.query import CitationResponse, GroundedAnswerResponse, QueryRequest
 from app.models.enums import (
@@ -333,7 +333,6 @@ class TestRateLimitResponseShape:
             query_rate_limit,
             ingest_rate_limit,
             default_rate_limit,
-            RateLimitResult,
         )
         assert QUERY_RPM >= 1
         assert INGEST_RPM >= 1

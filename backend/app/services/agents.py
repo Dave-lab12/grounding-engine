@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import status
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

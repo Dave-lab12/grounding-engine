@@ -516,6 +516,6 @@ def test_document_upload_autoruns_pipeline_and_query_returns_grounded_answer(
                 """,
                 (seeded_upload_data.tenant_id, document_id),
             )
-            chunk_count_row = cursor.fetchone()
+            assert cursor.fetchone() is not None
 
     assert document_row == ("uploaded",)
