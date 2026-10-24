@@ -101,6 +101,25 @@ async def embed_texts(
             if not settings.embedding_provider_fallback_enabled:
                 raise
 
+    if settings.embedding_backend == "bedrock_v1":
+        from app.core.bedrock_embeddings import (
+            BedrockEmbeddingError,
+            embed_texts_bedrock,
+        )
+
+        try:
+            return await embed_texts_bedrock(texts, purpose=purpose)
+        except BedrockEmbeddingError as exc:
+            logger.warning(
+                "embedding_provider_failed",
+                configured_backend="bedrock_v1",
+                purpose=purpose,
+                fallback_enabled=settings.embedding_provider_fallback_enabled,
+                error=str(exc),
+            )
+            if not settings.embedding_provider_fallback_enabled:
+                raise
+
     return [
         DenseEmbedding(text=text, vector=build_dense_embedding(text, dimensions=dimensions))
         for text in texts

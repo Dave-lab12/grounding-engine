@@ -204,3 +204,30 @@ make benchmark-beir-smoke
 Use `.env.example` as the public template. Do not commit local `.env` files, real API keys, provider secrets, database credentials, or private tokens.
 
 `FRONTEND_URL` is still a backend setting because OAuth, email, and invitation flows need the URL of the separately hosted client application.
+
+## AWS Bedrock
+
+Every provider slot (generation, dense embeddings, the Enterprise reranker) has a `bedrock_v1` backend that
+runs on AWS Bedrock through boto3, which the backend already depends on for object storage.
+
+- Credentials come from the AWS default chain: `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID` and
+  `AWS_SECRET_ACCESS_KEY` in the shell, or an instance role. The S3 settings are not used.
+- `BEDROCK_REGION` picks the region; `BEDROCK_MODEL` is the generation and reranking model, given as an
+  inference profile id (for example `us.anthropic.<model>`).
+- `BEDROCK_EMBEDDING_MODEL` defaults to Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`), whose
+  request body the embedding backend speaks. Its vector size is 256, 512 or 1024, so set
+  `DENSE_EMBEDDING_DIMENSIONS` to one of those and re-index after switching embedding backends.
+- Generation uses the Converse API with the same grounded JSON contract, prompt and evidence validation as the
+  Gemini backend, so answers from the two providers are held to the same rules.
+
+```bash
+GENERATOR_BACKEND=bedrock_v1
+EMBEDDING_BACKEND=bedrock_v1
+ENTERPRISE_RERANKER_BACKEND=bedrock_v1
+BEDROCK_REGION=us-east-1
+BEDROCK_MODEL=us.anthropic.<model>
+DENSE_EMBEDDING_DIMENSIONS=1024
+```
+
+The unit tests in `backend/tests/unit/test_bedrock_providers.py` cover the three backends against a fake
+client and need no AWS account.

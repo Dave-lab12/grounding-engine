@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import re
 
 from app.config import get_settings
+from app.core.bedrock_generator import BedrockGenerationError, generate_bedrock_draft
 from app.core.gemini_generator import GeminiGenerationError, generate_gemini_draft
 from app.core.llm_client import GroundedGenerationError, generate_grounded_draft
 from app.core.openai_generator import (
@@ -99,6 +100,12 @@ class GenerationBackend:
                 evidence_package=evidence_package,
                 agent_instructions=agent_instructions,
             )
+        if self.implementation == "bedrock":
+            return await generate_bedrock_draft(
+                query_text=query_text,
+                evidence_package=evidence_package,
+                agent_instructions=agent_instructions,
+            )
         return generate_grounded_draft(
             query_text=query_text,
             evidence_package=evidence_package,
@@ -118,6 +125,10 @@ _GENERATION_BACKENDS = {
     "openai_compatible_v1": GenerationBackend(
         provider_name="openai_compatible_v1",
         implementation="openai_compatible",
+    ),
+    "bedrock_v1": GenerationBackend(
+        provider_name="bedrock_v1",
+        implementation="bedrock",
     ),
 }
 
@@ -543,7 +554,7 @@ async def generate_answer_from_evidence(
                 configured_backend=backend.provider_name,
                 reason=str(exc),
             )
-        except (GeminiGenerationError, OpenAICompatibleGenerationError) as exc:
+        except (GeminiGenerationError, OpenAICompatibleGenerationError, BedrockGenerationError) as exc:
             _last_exc = exc
             logger.warning(
                 "generation_provider_failed",
